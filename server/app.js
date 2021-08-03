@@ -1,23 +1,32 @@
 // importação de dependência(s)
-
+const express = require('express');
+const fs = require('fs');
 
 // variáveis globais deste módulo
 const PORT = 3000
-const db = {}
-
+let db_jogadores = {}
+let db_jogos_por_jogador = {}
+let db = {}
+const app = express();
 
 // carregar "banco de dados" (data/jogadores.json e data/jogosPorJogador.json)
 // você pode colocar o conteúdo dos arquivos json no objeto "db" logo abaixo
 // dica: 1-4 linhas de código (você deve usar o módulo de filesystem (fs))
 
+fs.readFile('server/data/jogadores.json', 'utf8', (_, data) => {
+  db_jogadores = JSON.parse(data);
+});
 
-
+fs.readFile('server/data/jogosPorJogador.json', 'utf8', (_, data) => {
+  db_jogos_por_jogador = JSON.parse(data);
+});
 
 // configurar qual templating engine usar. Sugestão: hbs (handlebars)
 //app.set('view engine', '???qual-templating-engine???');
 //app.set('views', '???caminho-ate-pasta???');
 // dica: 2 linhas
-
+app.set('view engine', 'hbs');
+app.set('views', 'server/views');
 
 // EXERCÍCIO 2
 // definir rota para página inicial --> renderizar a view index, usando os
@@ -25,7 +34,9 @@ const db = {}
 // dica: o handler desta função é bem simples - basta passar para o template
 //       os dados do arquivo data/jogadores.json (~3 linhas)
 
-
+app.get('/', (_, res) => {
+  res.render('index', db_jogadores);
+});
 
 // EXERCÍCIO 3
 // definir rota para página de detalhes de um jogador --> renderizar a view
@@ -33,11 +44,45 @@ const db = {}
 // "data/jogosPorJogador.json", assim como alguns campos calculados
 // dica: o handler desta função pode chegar a ter ~15 linhas de código
 
+app.get('/jogador/:id', (req, res) => {
+  const dados = db_jogadores.players.find(f => f.steamid === req.params.id);
+  const dados_jogos = db_jogos_por_jogador[req.params.id];
+  let dados_jogos_map = dados_jogos.games.map(f => {
+    return {
+      appid: f.appid,
+      name: f.name,
+      playtime_forever: Math.round(f.playtime_forever > 0 ? f.playtime_forever/60 : 0),
+      img_logo_url: f.img_logo_url
+    }
+  });
+
+  dados_jogos_map = dados_jogos_map.sort((a, b) => b.playtime_forever - a.playtime_forever);
+  
+  const result = {
+    steamid: dados.steamid,
+    personame: dados.personaname,
+    profileurl: dados.profileurl,
+    avatarmedium: dados.avatarmedium,
+    realname: dados.realname,
+    loccountrycode: dados.loccountrycode,
+    games_count: dados_jogos_map.length,
+    games_unplayed: dados_jogos_map.filter(f => f.playtime_forever === 0).length,
+    games: dados_jogos_map.slice(0, 5)
+  }
+  
+  res.render('jogador', result);
+});
+
 
 // EXERCÍCIO 1
 // configurar para servir os arquivos estáticos da pasta "client"
 // dica: 1 linha de código
 
+app.use(express.static('client'));
 
 // abrir servidor na porta 3000 (constante PORT)
 // dica: 1-3 linhas de código
+
+app.listen(PORT, () => {
+  console.log(`Server is running at localhost:${PORT}`)
+})
